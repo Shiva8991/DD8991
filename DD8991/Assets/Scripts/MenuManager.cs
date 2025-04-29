@@ -5,65 +5,103 @@ using TMPro;
 
 public class MenuManager : MonoBehaviour
 {
+    public static MenuManager Instance { get; private set; }
+
+    [Header("Level Settings")]
+    public List<LayoutData> levels = new(); // Fill via Inspector
+
+    [Header("UI Elements")]
     public TMP_Dropdown layoutDropdown;
-    public GameManager gameManager;
-    public GameObject MenunScreen;
-    public GameObject GameScreen;
+    public GameObject menuScreen;
+    public GameObject gameScreen;
     public GameObject buttonsParent;
 
-    Dictionary<string, Vector2Int> layouts = new()
+    private void Awake()
     {
-        { "Select Layout", new Vector2Int(2,2) },
-        { "2x2", new Vector2Int(2,2) },
-        { "2x3", new Vector2Int(2,3) },
-        { "3x3", new Vector2Int(3,3) },
-        { "4x4", new Vector2Int(4,4) }
-    };
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
 
-    void Start()
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+    }
+
+    private void Start()
+    {
+        InitScreen();
+    }
+
+    public void InitScreen()
     {
         SetScreen(false);
-        toggleButtons(false);
-        layoutDropdown.onValueChanged.AddListener(OnLayoutChanged);
+        PopulateDropdown();
         OnLayoutChanged(0);
+    }
+
+    public void PopulateDropdown()
+    {
+        layoutDropdown.ClearOptions();
+        List<string> options = new();
+
+        options.Add("Select Layout"); // Always first option
+        foreach (var level in levels)
+        {
+            options.Add(level.levelName);
+        }
+
+        layoutDropdown.AddOptions(options);
+        layoutDropdown.onValueChanged.AddListener(OnLayoutChanged);
     }
 
     private void toggleButtons(bool show)
     {
         foreach (Transform child in buttonsParent.transform)
         {
-            child.GetComponent<Button>().interactable = show;
+            if (!child.CompareTag("DontDisable"))
+            {
+                Button button = child.GetComponent<Button>();
+                if (button != null)
+                {
+                    button.interactable = show;
+                }
+            }
         }
     }
 
     public void SetScreen(bool showGameScreen)
     {
-        MenunScreen.SetActive(!showGameScreen);
-        GameScreen.SetActive(showGameScreen);
+        menuScreen.SetActive(!showGameScreen);
+        gameScreen.SetActive(showGameScreen);
+        GameManager.Instance.commonPopup.HidePopup();
     }
 
-    void OnLayoutChanged(int index)
+    public void OnLayoutChanged(int index)
     {
-        var selected = layoutDropdown.options[index].text;
-        Vector2Int size = layouts[selected];
-        gameManager.SetGridSize(size.x, size.y);
-        toggleButtons(index != 0);
-
+        Debug.Log($"index: {index}");
+        if (index == 0)
+        {
+            toggleButtons(false);
+            return;
+        }
+        GameManager.Instance.SetCurrentLevel(index);
+        toggleButtons(true);
     }
 
     public void OnPlayClicked()
     {
         Debug.Log("Play clicked!");
         SetScreen(true);
-        gameManager.StartGame();
+        GameManager.Instance.StartGame();
     }
-    //public void OnLoadClicked() => gameManager.LoadGame();
+
     public void OnExitClicked()
     {
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
-    Application.Quit();
+        Application.Quit();
 #endif
     }
 }

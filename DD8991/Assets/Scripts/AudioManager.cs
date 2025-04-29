@@ -26,25 +26,26 @@ public class AudioManager : MonoBehaviour
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-            audioSource = GetComponent<AudioSource>();
-
-            foreach (var entry in soundEntries)
-            {
-                if (!soundMap.ContainsKey(entry.type))
-                {
-                    soundMap.Add(entry.type, entry.clip);
-                }
-            }
-        }
-        else
+        if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        audioSource = GetComponent<AudioSource>();
+
+        foreach (var entry in soundEntries)
+        {
+            if (!soundMap.ContainsKey(entry.type))
+            {
+                soundMap.Add(entry.type, entry.clip);
+            }
         }
     }
+
 
     public void PlaySound(SoundType type)
     {

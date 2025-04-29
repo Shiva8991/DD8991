@@ -2,7 +2,6 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
-
 public class Card : MonoBehaviour
 {
     public Image frontImage;
@@ -10,21 +9,19 @@ public class Card : MonoBehaviour
     public Button button;
 
     private int id;
-    private bool isFlipped = false;
-    private GameManager manager;
+    public bool isFlipped = false;
 
-    public void Setup(CardData data, GameManager gm)
+    public void Setup(CardData data)
     {
         id = data.id;
         frontImage.sprite = data.frontSprite;
-        manager = gm;
     }
 
     public int GetID() => id;
 
     public void Flip(bool showFront)
     {
-        if (gameObject.activeInHierarchy) // ensure object is alive
+        if (gameObject.activeInHierarchy)
             StartCoroutine(FlipAnimation(showFront));
     }
 
@@ -51,7 +48,7 @@ public class Card : MonoBehaviour
         frontImage.gameObject.SetActive(showFront);
         backImage.gameObject.SetActive(!showFront);
 
-        AudioManager.Instance.PlaySound(SoundType.Flip); // Play flip sound exactly at swap
+        AudioManager.Instance.PlaySound(SoundType.Flip); // Flip sound at midpoint
 
         // Expand back to normal
         elapsed = 0f;
@@ -64,21 +61,21 @@ public class Card : MonoBehaviour
         transform.localScale = originalScale;
     }
 
-
-
     public void OnClick()
     {
         Debug.Log($"Card {id} clicked!");
-        if (!isFlipped && manager.CanFlip(this))
+        Debug.Log($"isFlipped: {isFlipped}");
+        Debug.Log($"CanFlip: {GameManager.Instance.CanFlip(this)}");
+
+        if (!isFlipped && GameManager.Instance.CanFlip(this))
         {
             Flip(true);
-            manager.RegisterFlip(this);
+            GameManager.Instance.RegisterFlip(this);
         }
     }
 
     public void Lock() => button.interactable = false;
     public void Unlock() => button.interactable = true;
-
     public void Hide() => gameObject.SetActive(false);
     public void Show() => gameObject.SetActive(true);
 }
