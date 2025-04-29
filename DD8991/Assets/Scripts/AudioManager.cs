@@ -46,7 +46,6 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-
     public void PlaySound(SoundType type)
     {
         if (soundMap.TryGetValue(type, out AudioClip clip))

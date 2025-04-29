@@ -7,7 +7,6 @@ public class Card : MonoBehaviour
     public Image frontImage;
     public Image backImage;
     public Button button;
-
     private int id;
     public bool isFlipped = false;
 
@@ -18,6 +17,11 @@ public class Card : MonoBehaviour
     }
 
     public int GetID() => id;
+
+    public string GetFrontSpriteName()
+    {
+        return frontImage.sprite != null ? frontImage.sprite.name : "";
+    }
 
     public void Flip(bool showFront)
     {
@@ -43,12 +47,12 @@ public class Card : MonoBehaviour
         }
         transform.localScale = targetScale;
 
-        // 🔥 Swap and play flip sound
+        // Swap and play flip sound
         isFlipped = showFront;
         frontImage.gameObject.SetActive(showFront);
         backImage.gameObject.SetActive(!showFront);
 
-        AudioManager.Instance.PlaySound(SoundType.Flip); // Flip sound at midpoint
+        AudioManager.Instance.PlaySound(SoundType.Flip);
 
         // Expand back to normal
         elapsed = 0f;
@@ -61,21 +65,24 @@ public class Card : MonoBehaviour
         transform.localScale = originalScale;
     }
 
+    /// <summary>
+    /// Immediately sets a card's visual state to either face-up or face-down without flip animation.
+    /// </summary>
+    /// <param name="showFront">If true, shows the card's front (face-up). If false, shows the back (face-down).</param>
+    public void ForceFlip(bool showFront)
+    {
+        isFlipped = showFront;
+        frontImage.gameObject.SetActive(showFront);
+        backImage.gameObject.SetActive(!showFront);
+    }
+
     public void OnClick()
     {
-        Debug.Log($"Card {id} clicked!");
-        Debug.Log($"isFlipped: {isFlipped}");
-        Debug.Log($"CanFlip: {GameManager.Instance.CanFlip(this)}");
-
         if (!isFlipped && GameManager.Instance.CanFlip(this))
         {
             Flip(true);
             GameManager.Instance.RegisterFlip(this);
         }
     }
-
-    public void Lock() => button.interactable = false;
-    public void Unlock() => button.interactable = true;
     public void Hide() => gameObject.SetActive(false);
-    public void Show() => gameObject.SetActive(true);
 }

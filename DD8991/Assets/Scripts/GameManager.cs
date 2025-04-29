@@ -10,25 +10,32 @@ public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    public GameObject cardPrefab;
-    public CommonPopup commonPopup;
-    public Transform cardParent;
-    public Sprite[] spriteList;
-    public TextMeshProUGUI scoreText;
-    public TextMeshProUGUI tryText;
+    [Header("Game Settings")]
+    public int currentLevel = 1;
     [HideInInspector] public int score = 0;
     [HideInInspector] public int tries = 0;
+    public bool gameOver = false;
 
-    [SerializeField] private List<CardData> runtimePool = new();
-    private List<Card> flippedCards = new();
+    [Header("Card Settings")]
+    public GameObject cardPrefab;
+    public float cardAspectRatio = 0.8f;
+    public Sprite[] spriteList;
+    public Transform cardParent;
 
+    [Header("UI References")]
+    public TextMeshProUGUI scoreText;
+    public TextMeshProUGUI tryText;
+    public CommonPopup commonPopup;
+
+    [Header("Runtime Data")]
+    public List<CardData> runtimePool = new();
+    public List<Card> flippedCards = new();
+
+    [Header("Board Configuration")]
     private int columns = 4;
     private int rows = 4;
-    public float cardAspectRatio = 0.8f;
-    bool gameOver = false;
-    int currentLevel = 1;
 
-    void Awake()
+    private void Awake()
     {
         if (Instance != null && Instance != this)
         {
@@ -40,11 +47,6 @@ public class GameManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
     }
 
-    private void Start()
-    {
-        LoadGame();
-    }
-
     public void StartGame()
     {
         ClearCards();
@@ -53,28 +55,36 @@ public class GameManager : MonoBehaviour
         CreateLayout();
         StartCoroutine(ShowAllCardsBriefly());
     }
+    
+    #region Game State Management
 
-    public void SetCurrentLevel(int level) => currentLevel = level;
-
-    void InItScreen(int level)
+    public void ClearCards()
     {
-        Debug.Log("Initializing screen for level: " + level);
-        var levelData = MenuManager.Instance.levels[level - 1];
-        Debug.Log("Level Data: " + levelData.levelName + " " + levelData.columns + " " + levelData.rows + " " + levelData.tries);
-        columns = levelData.columns;
-        rows = levelData.rows;
-        tries = levelData.tries;
-        tryText.text = tries.ToString();
-        score = 0;
-        scoreText.text = score.ToString();
+        foreach (Transform child in cardParent)
+            Destroy(child.gameObject);
     }
 
+    public void InItScreen(int level, bool isFromSave = false)
+    {
+        var levelData = MenuManager.Instance.levels[level - 1];
+        columns = levelData.columns;
+        rows = levelData.rows;
+
+        // Only reset tries/score if NOT loading from a save
+        if (!isFromSave)
+        {
+            tries = levelData.tries;
+            score = 0;
+        }
+        // Update UI elements
+        tryText.text = tries.ToString();
+        scoreText.text = score.ToString();
+    }
 
     private void PrepareRuntimeCardPool()
     {
         runtimePool.Clear();
         int totalCards = columns * rows;
-
         int maxUniquePairsNeeded = Mathf.CeilToInt(totalCards / 2f);
 
         if (spriteList.Length == 0)
@@ -105,29 +115,12 @@ public class GameManager : MonoBehaviour
             var data = generatedCardData[i % maxUniquePairsNeeded];
             runtimePool.Add(data);
         }
-
         Utils.Shuffle(runtimePool);
     }
 
-    private IEnumerator ShowAllCardsBriefly()
+    public void CreateLayout()
     {
-        foreach (var card in cardParent.GetComponentsInChildren<Card>())
-            card.Flip(true);
-
-        yield return new WaitForSeconds(2f);
-
-        foreach (var card in cardParent.GetComponentsInChildren<Card>())
-            card.Flip(false);
-    }
-
-    private void ClearCards()
-    {
-        foreach (Transform child in cardParent)
-            Destroy(child.gameObject);
-    }
-
-    private void CreateLayout()
-    {
+        Debug.Log("<color=magenta>ENTER CREATELAYOUT</color>");
         ClearCards();
 
         RectTransform parentRect = cardParent.GetComponent<RectTransform>();
@@ -169,10 +162,21 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private IEnumerator ShowAllCardsBriefly()
+    {
+        foreach (var card in cardParent.GetComponentsInChildren<Card>())
+            card.Flip(true);
+
+        yield return new WaitForSeconds(2f);
+
+        foreach (var card in cardParent.GetComponentsInChildren<Card>())
+            card.Flip(false);
+    }
+    #endregion
+    public void SetCurrentLevel(int level) => currentLevel = level;
+
     public void RegisterFlip(Card card)
     {
-        Debug.Log("ENTER REGISTERFLIP, tries: " + tries);
-
         if (tries <= 0) return;
 
         flippedCards.Add(card);
@@ -181,17 +185,12 @@ public class GameManager : MonoBehaviour
         {
             tries--;
             tryText.text = tries.ToString();
-            Debug.Log("tries2 :: " + tries);
-
             StartCoroutine(CheckMatch());
         }
     }
 
-
     private IEnumerator CheckMatch()
     {
-        Debug.Log("ENTER CHECKMATCH");
-
         Card a = flippedCards[0];
         Card b = flippedCards[1];
 
@@ -203,7 +202,6 @@ public class GameManager : MonoBehaviour
             yield return new WaitForSeconds(1f);
             a.Hide();
             b.Hide();
-
         }
         else
         {
@@ -211,13 +209,18 @@ public class GameManager : MonoBehaviour
             yield return new WaitForSeconds(1f);
             a.Flip(false);
             b.Flip(false);
-
         }
 
         flippedCards.Clear();
+        ManagePopups();
+    }
 
-        // 🔥 After flipping check game state correctly
-        if (IsGameWon() && !gameOver)
+    /// <summary>
+    /// Checks if the level is completed or last level is reached. Shows appropriate popups.
+    /// </summary>
+    public void ManagePopups()
+    {
+        if (IsLevelCompleted() && !gameOver)
         {
             Debug.Log("currentLevel: " + currentLevel + " levels: " + MenuManager.Instance.levels.Count);
 
@@ -227,7 +230,7 @@ public class GameManager : MonoBehaviour
                 commonPopup.ShowPopup(
                     $"Level cleared! Your score: {score}",
                     "TRY NEXT", LoadNextLevel,
-                    "EXIT", ExitToMainMenu
+                    "EXIT", () => ExitToMainMenu(true)
                 );
             }
             else
@@ -236,36 +239,34 @@ public class GameManager : MonoBehaviour
                 commonPopup.ShowPopup(
                     $"Congrats, all levels cleared!",
                     "RESTART", RestartLevel,
-                    "EXIT", ExitToMainMenu
+                    "EXIT", () => ExitToMainMenu(false)
                 );
             }
         }
-        else if (tries <= 0 && !gameOver)
+        else if (tries <= 0)
         {
             Debug.Log("Tries exhausted - Game Over!");
             StartCoroutine(GameOver());
         }
     }
 
-    private bool IsGameWon()
+    public bool IsLevelCompleted()
     {
-        int activeCards = 0;
+        int interactableCards = 0;
 
-        foreach (Transform child in cardParent)
+        foreach (Card card in cardParent.GetComponentsInChildren<Card>())
         {
-            if (child.gameObject.activeInHierarchy)
-                activeCards++;
+            // Count cards that are both active AND interactable (not matched)
+            if (card.gameObject.activeInHierarchy && card.button.interactable)
+                interactableCards++;
         }
-
-        return activeCards <= 1;
+        // Win condition: 0 or 1 cards remaining (handles odd-numbered layouts)
+        return interactableCards <= 1;
     }
-
 
     private IEnumerator GameOver()
     {
-        Debug.Log("Game Over!");
         gameOver = true;
-
 
         yield return new WaitForSeconds(1f);
 
@@ -274,14 +275,16 @@ public class GameManager : MonoBehaviour
             card.Flip(true);
         }
         AudioManager.Instance.PlaySound(SoundType.GameOver);
+
         yield return new WaitForSeconds(1f);
 
         commonPopup.ShowPopup(
             $"Game Over! Your score: {score}",
             "RETRY", RestartLevel,
-            "EXIT", ExitToMainMenu);
+            "EXIT", () => ExitToMainMenu(true));
     }
 
+    #region Button Callbacks.
     void Reset()
     {
         gameOver = false;
@@ -291,23 +294,34 @@ public class GameManager : MonoBehaviour
 
     void RestartLevel()
     {
+        SaveSystem.DeleteSave();
         Reset();
         StartGame();
     }
 
     void LoadNextLevel()
     {
+        SaveSystem.DeleteSave();
         Reset();
         currentLevel++;
         StartGame();
     }
 
-    public void ExitToMainMenu()
+    public void ExitToMainMenu(bool saveBeforeExit = true)
     {
+        if (saveBeforeExit)
+        {
+            SaveSystem.SaveGame();
+        }
+        else
+        {
+            SaveSystem.DeleteSave();
+        }
+        ClearCards();
         Reset();
         MenuManager.Instance.InitScreen();
     }
-
+    #endregion
 
 
     public bool CanFlip(Card card)
@@ -328,14 +342,19 @@ public class GameManager : MonoBehaviour
         return -1;
     }
 
-
     public void SaveGame()
     {
-        SaveManager.Save();
+        SaveSystem.SaveGame();
     }
 
-    public void LoadGame()
+    public bool LoadGame()
     {
-        SaveManager.Load();
+        return SaveSystem.LoadGame();
     }
+
+    /* private void OnApplicationQuit()
+    {
+        Debug.Log("Application is quitting. Saving game state.");
+        SaveSystem.SaveGame();
+    } */
 }

@@ -15,6 +15,7 @@ public class MenuManager : MonoBehaviour
     public GameObject menuScreen;
     public GameObject gameScreen;
     public GameObject buttonsParent;
+    public Button continueButton;
 
     private void Awake()
     {
@@ -40,12 +41,27 @@ public class MenuManager : MonoBehaviour
         OnLayoutChanged(0);
     }
 
+    /// <summary>
+    /// Switches between menu and game screens, hides popups, and updates continue button state.
+    /// </summary>
+    /// <param name="showGameScreen">True to show game screen, false for menu</param>
+    public void SetScreen(bool showGameScreen)
+    {
+        menuScreen.SetActive(!showGameScreen);
+        gameScreen.SetActive(showGameScreen);
+        GameManager.Instance.commonPopup.HidePopup();
+        continueButton.interactable = SaveSystem.HasSavedGame();
+    }
+
+    /// <summary>
+    /// Populates the dropdown with level names as filled by user in Inspector.
+    /// </summary>
     public void PopulateDropdown()
     {
         layoutDropdown.ClearOptions();
         List<string> options = new();
 
-        options.Add("Select Layout"); // Always first option
+        options.Add("Select Layout");
         foreach (var level in levels)
         {
             options.Add(level.levelName);
@@ -53,6 +69,17 @@ public class MenuManager : MonoBehaviour
 
         layoutDropdown.AddOptions(options);
         layoutDropdown.onValueChanged.AddListener(OnLayoutChanged);
+    }
+
+    public void OnLayoutChanged(int index)
+    {
+        if (index == 0)
+        {
+            toggleButtons(false);
+            return;
+        }
+        GameManager.Instance.SetCurrentLevel(index);
+        toggleButtons(true);
     }
 
     private void toggleButtons(bool show)
@@ -70,38 +97,31 @@ public class MenuManager : MonoBehaviour
         }
     }
 
-    public void SetScreen(bool showGameScreen)
-    {
-        menuScreen.SetActive(!showGameScreen);
-        gameScreen.SetActive(showGameScreen);
-        GameManager.Instance.commonPopup.HidePopup();
-    }
-
-    public void OnLayoutChanged(int index)
-    {
-        Debug.Log($"index: {index}");
-        if (index == 0)
-        {
-            toggleButtons(false);
-            return;
-        }
-        GameManager.Instance.SetCurrentLevel(index);
-        toggleButtons(true);
-    }
-
+    #region Button Callbacks
     public void OnPlayClicked()
     {
-        Debug.Log("Play clicked!");
         SetScreen(true);
         GameManager.Instance.StartGame();
     }
 
+    public void OnContinueClicked()
+    {
+        Debug.Log("<color=white>Continue clicked! </color>");
+        SetScreen(true);
+        if (!GameManager.Instance.LoadGame())
+        {
+            OnPlayClicked();
+        }
+    }
+
     public void OnExitClicked()
     {
+        Debug.Log("Exit clicked!");
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
         Application.Quit();
 #endif
     }
+    #endregion
 }
