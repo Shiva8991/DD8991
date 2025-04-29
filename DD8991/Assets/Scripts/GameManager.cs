@@ -302,7 +302,7 @@ public class GameManager : MonoBehaviour
         StartGame();
     }
 
-    void ExitToMainMenu()
+    public void ExitToMainMenu()
     {
         Reset();
         MenuManager.Instance.InitScreen();
